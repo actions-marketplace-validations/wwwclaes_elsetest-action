@@ -1,0 +1,140 @@
+name: Run Elsetest
+description: Test a website in a real browser for accessibility, broken text, spelling, invalid HTML and errors, with a video of the run.
+author: Elsetest
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  url:
+    description: The site to test. Not needed when the config file has it.
+    required: false
+  config:
+    description: A config file (JSON), e.g. one made with `elsetest --setup`. See https://elsetest.com/docs/options
+    required: false
+  duration:
+    description: How long to test, e.g. `5m` or `1h`.
+    required: false
+    default: 5m
+  fail-on:
+    description: Fail the job when the run logs messages at this level or above, `warn` or `error`, or `none` to fail only when the test can't run.
+    required: false
+    default: error
+  api-key:
+    description: Your Elsetest API key, from a repository secret. `elsetest --login` stores it in credentials.json in your settings folder (~/.config/elsetest on Linux).
+    required: false
+  args:
+    description: More command-line options, e.g. `--scope /shop --ignoreLogs "Mixed Content"`, quoted as in a shell. See https://elsetest.com/docs/options
+    required: false
+    default: ''
+  version:
+    description: The Elsetest version, `latest` or e.g. `0.9.8`.
+    required: false
+    default: latest
+  upload-results:
+    description: Upload the log and the video as a workflow artifact, `true` or `false`.
+    required: false
+    default: 'true'
+  artifact-name:
+    description: The name of the uploaded artifact.
+    required: false
+    default: elsetest
+
+outputs:
+  exit-code:
+    description: Elsetest's exit code: 0 ran to its end, 1 couldn't go on, 2 testing time ran out, 3 problems found (fail-on).
+    value: ${{ steps.run.outputs.exit-code }}
+  results-dir:
+    description: The folder with the run's log (elsetest.log) and video (elsetest.mp4).
+    value: ${{ steps.run.outputs.results-dir }}
+  warnings:
+    description: How many warnings the run logged.
+    value: ${{ steps.summary.outputs.warnings }}
+  errors:
+    description: How many errors the run logged.
+    value: ${{ steps.summary.outputs.errors }}
+  version:
+    description: The Elsetest version that ran.
+    value: ${{ steps.install.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Elsetest
+      id: install
+      shell: bash
+      env:
+        ELSETEST_VERSION: ${{ inputs.version }}
+      run: node "$GITHUB_ACTION_PATH/install.mjs"
+
+    - name: Cache Chrome and ffmpeg
+      uses: actions/cache@v5
+      with:
+        path: |
+          ${{ steps.install.outputs.cache-dir }}
+          ~/.cache/elsetest/ffmpeg
+          ~/Library/Caches/elsetest/ffmpeg
+          ~/AppData/Local/elsetest/ffmpeg
+        key: elsetest-${{ steps.install.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Run Elsetest
+      id: run
+      shell: bash
+      env:
+        ELSETEST_API_KEY: ${{ inputs.api-key || env.ELSETEST_API_KEY }}
+        ELSETEST_BIN: ${{ steps.install.outputs.path }}
+        PUPPETEER_CACHE_DIR: ${{ steps.install.outputs.cache-dir }}
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_DURATION: ${{ inputs.duration }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_ARGS: ${{ inputs.args }}
+        RESULTS_DIR: ${{ runner.temp }}/elsetest-results
+      run: |
+        options=(--headless --gui false --dir "$RESULTS_DIR" --duration "$INPUT_DURATION" --failOn "$INPUT_FAIL_ON")
+        [ -n "$INPUT_URL" ] && options+=(--url "$INPUT_URL")
+        [ -n "$INPUT_CONFIG" ] && options+=(--config "$INPUT_CONFIG")
+        # The workflow's own options, split and unquoted as a shell would.
+        eval "extra=($INPUT_ARGS)"
+        mkdir -p "$RESULTS_DIR"
+        set +e
+        "$ELSETEST_BIN" "${options[@]}" "${extra[@]}" < /dev/null
+        code=$?
+        set -e
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        run_dir=$(ls -td "$RESULTS_DIR"/*/ 2>/dev/null | head -1)
+        echo "results-dir=${run_dir%/}" >> "$GITHUB_OUTPUT"
+
+    - name: Summarize the run
+      id: summary
+      if: always() && steps.run.outcome == 'success'
+      shell: bash
+      env:
+        RUN_DIR: ${{ steps.run.outputs.results-dir }}
+        EXIT_CODE: ${{ steps.run.outputs.exit-code }}
+        ARTIFACT: ${{ inputs.upload-results == 'true' && inputs.artifact-name || '' }}
+      run: node "$GITHUB_ACTION_PATH/summary.mjs"
+
+    - name: Upload the log and video
+      if: always() && inputs.upload-results == 'true' && steps.run.outputs.results-dir != ''
+      uses: actions/upload-artifact@v6
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ steps.run.outputs.results-dir }}
+        if-no-files-found: ignore
+
+    - name: Check the result
+      if: always() && steps.run.outcome == 'success'
+      shell: bash
+      env:
+        EXIT_CODE: ${{ steps.run.outputs.exit-code }}
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        case "$EXIT_CODE" in
+          0) exit 0 ;;
+          1) echo "::error title=Elsetest::The test couldn't go on: see the run's log above." ;;
+          2) echo "::error title=Elsetest::Your testing time ran out. Add more at https://elsetest.com" ;;
+          3) echo "::error title=Elsetest::Problems found (fail-on: $FAIL_ON). See the job summary." ;;
+          *) echo "::error title=Elsetest::Elsetest exited with code $EXIT_CODE." ;;
+        esac
+        exit "$EXIT_CODE"
