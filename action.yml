@@ -42,7 +42,7 @@ inputs:
 
 outputs:
   exit-code:
-    description: Elsetest's exit code: 0 ran to its end, 1 couldn't go on, 2 testing time ran out, 3 problems found (fail-on).
+    description: "Elsetest's exit code: 0 ran to its end, 1 couldn't go on, 2 testing time ran out, 3 problems found (fail-on)."
     value: ${{ steps.run.outputs.exit-code }}
   results-dir:
     description: The folder with the run's log (elsetest.log) and video (elsetest.mp4).
