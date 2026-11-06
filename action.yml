@@ -102,7 +102,7 @@ runs:
         code=$?
         set -e
         echo "exit-code=$code" >> "$GITHUB_OUTPUT"
-        run_dir=$(ls -td "$RESULTS_DIR"/*/ 2>/dev/null | head -1)
+        run_dir=$(ls -td "$RESULTS_DIR"/*/ 2>/dev/null | head -1 || true)
         echo "results-dir=${run_dir%/}" >> "$GITHUB_OUTPUT"
 
     - name: Summarize the run
