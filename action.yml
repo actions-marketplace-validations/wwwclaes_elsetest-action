@@ -91,7 +91,8 @@ runs:
         INPUT_ARGS: ${{ inputs.args }}
         RESULTS_DIR: ${{ runner.temp }}/elsetest-results
       run: |
-        options=(--headless --gui false --dir "$RESULTS_DIR" --duration "$INPUT_DURATION" --failOn "$INPUT_FAIL_ON")
+        options=(--headless --gui false --dir "$RESULTS_DIR" --duration "$INPUT_DURATION")
+        [ "$INPUT_FAIL_ON" != none ] && options+=(--failOn "$INPUT_FAIL_ON")
         [ -n "$INPUT_URL" ] && options+=(--url "$INPUT_URL")
         [ -n "$INPUT_CONFIG" ] && options+=(--config "$INPUT_CONFIG")
         # The workflow's own options, split and unquoted as a shell would.
