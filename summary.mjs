@@ -71,7 +71,7 @@ output('warnings', count('WARN'));
   });
 });
 
-let summary = `## Elsetest\n\n${outcomes[exitCode] ?? `Elsetest exited with code ${exitCode}.`}\n\n`;
+let summary = `## [Elsetest](https://elsetest.com)\n\n${outcomes[exitCode] ?? `Elsetest exited with code ${exitCode}.`}\n\n`;
 summary += `| Errors | Warnings | Info |\n|---:|---:|---:|\n| ${count('ERROR')} | ${count('WARN')} | ${count('INFO')} |\n`;
 summary += section('Errors', errors) + section('Warnings', warnings);
 if (artifact) summary += `\nThe log and the video of the run are in the artifact **${html(artifact)}**.\n`;
