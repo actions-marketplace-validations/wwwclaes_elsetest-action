@@ -130,10 +130,15 @@ runs:
       env:
         EXIT_CODE: ${{ steps.run.outputs.exit-code }}
         FAIL_ON: ${{ inputs.fail-on }}
+        HAS_KEY: ${{ (inputs.api-key || env.ELSETEST_API_KEY) && 'true' || '' }}
       run: |
         case "$EXIT_CODE" in
           0) exit 0 ;;
-          1) echo "::error title=Elsetest::The test couldn't go on: see the run's log above." ;;
+          1) if [ -z "$HAS_KEY" ]; then
+               echo "::error title=Elsetest::No API key: set the action's api-key input, e.g. api-key: "'$'"{{ secrets.ELSETEST_API_KEY }}. See https://github.com/wwwclaes/elsetest-action#your-api-key"
+             else
+               echo "::error title=Elsetest::The test couldn't go on: see the run's log above."
+             fi ;;
           2) echo "::error title=Elsetest::Your testing time ran out. Add more at https://elsetest.com" ;;
           3) echo "::error title=Elsetest::Problems found (fail-on: $FAIL_ON). See the job summary." ;;
           *) echo "::error title=Elsetest::Elsetest exited with code $EXIT_CODE." ;;
