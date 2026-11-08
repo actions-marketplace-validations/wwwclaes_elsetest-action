@@ -52,7 +52,9 @@ function section(title, list) {
     return `<li><code>${time}</code> ${html(lines[0])}${count > 1 ? ` <i>(${count} times)</i>` : ''}${details}</li>`;
   });
   const more = list.length > maxListed ? `<li><i>and ${list.length - maxListed} more, in the log</i></li>` : '';
-  return `\n<details${title === 'Errors' ? ' open' : ''}><summary><b>${title}</b> (${list.length})</summary>\n<ul>${items.join('')}${more}</ul>\n</details>\n`;
+  const total = list.reduce((sum, { count }) => sum + count, 0);
+  const counted = total === list.length ? `${total}` : `${list.length} different`;
+  return `\n<details${title === 'Errors' ? ' open' : ''}><summary><b>${title}</b> (${counted})</summary>\n<ul>${items.join('')}${more}</ul>\n</details>\n`;
 }
 
 const logFile = runDir && path.join(runDir, 'elsetest.log');
